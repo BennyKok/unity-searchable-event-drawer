@@ -1,0 +1,16 @@
+{
+    "name": "com.bennykok.eventdrawer.editor",
+    "rootNamespace": "BennyKok.EventDrawer.Editor",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
