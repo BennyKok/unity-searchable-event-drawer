@@ -17,9 +17,45 @@ namespace BennyKok.EventDrawer.Editor
     public class AdvanceDropdownEventDrawer : UnityEventDrawer
     {
         public static SerializedObject copiedPersistentCalls;
+        public static SerializedProperty targetPersistentCalls;
+        public static int copySelectedIndex = -1;
 
         private AnimBool visible;
         private bool m_visible;
+
+        private void CopyPersistentCallProperty(string relative, SerializedProperty item, SerializedProperty copyItem)
+        {
+            SerializedProperty serializedProperty = item.FindPropertyRelative(relative);
+            SerializedProperty serializedProperty1 = copyItem.FindPropertyRelative(relative);
+
+            // p.s. not all serializedProperty type is checked, since some are only used in m_PersistentCalls.m_Calls
+            switch (serializedProperty.propertyType)
+            {
+                case SerializedPropertyType.ObjectReference:
+                    serializedProperty.objectReferenceValue = serializedProperty1.objectReferenceValue;
+                    break;
+                case SerializedPropertyType.String:
+                    serializedProperty.stringValue = serializedProperty1.stringValue;
+                    break;
+                case SerializedPropertyType.Enum:
+                    serializedProperty.enumValueIndex = serializedProperty1.enumValueIndex;
+                    break;
+                case SerializedPropertyType.Integer:
+                    serializedProperty.intValue = serializedProperty1.intValue;
+                    break;
+                case SerializedPropertyType.Float:
+                    serializedProperty.floatValue = serializedProperty1.floatValue;
+                    break;
+            }
+        }
+
+        private int lastSelected;
+
+        protected override void OnSelectEvent(ReorderableList list)
+        {
+            base.OnSelectEvent(list);
+            lastSelected = list.index;
+        }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -46,33 +82,55 @@ namespace BennyKok.EventDrawer.Editor
                     persistentCalls.ClearArray();
                     property.serializedObject.ApplyModifiedProperties();
                 });
+                menu.AddItem(new GUIContent("Copy Selected"), false, () =>
+                {
+                    if (copiedPersistentCalls != null)
+                        copiedPersistentCalls.Dispose();
+
+                    copySelectedIndex = lastSelected;
+                    copiedPersistentCalls = new SerializedObject(property.serializedObject.targetObject);
+                    targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
+                });
                 menu.AddItem(new GUIContent("Copy All"), false, () =>
                 {
                     if (copiedPersistentCalls != null)
                         copiedPersistentCalls.Dispose();
 
+                    copySelectedIndex = -1;
                     copiedPersistentCalls = new SerializedObject(property.serializedObject.targetObject);
+                    targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
                 });
 
-                if (copiedPersistentCalls != null)
+                if (copiedPersistentCalls != null && copySelectedIndex == -1)
                     menu.AddItem(new GUIContent("Paste All"), false, () =>
                     {
                         copiedPersistentCalls.Update();
-                        // persistentCalls.ClearArray();
-                        // persistentCalls.arraySize = copiedPersistentCalls.arraySize;
-                        // for (int i = 0; i < persistentCalls.arraySize; i++)
-                        // {
-                        //     var item = persistentCalls.GetArrayElementAtIndex(i);
-                        //     var copyItem = copiedPersistentCalls.GetArrayElementAtIndex(i);
-                        // }
 
-                        property.serializedObject.CopyFromSerializedProperty(copiedPersistentCalls.FindProperty(persistentCalls.propertyPath));
+                        persistentCalls.ClearArray();
+                        persistentCalls.arraySize = targetPersistentCalls.arraySize;
+                        for (int i = 0; i < persistentCalls.arraySize; i++)
+                        {
+                            CopyEvent(persistentCalls, i, i);
+                        }
 
                         property.serializedObject.ApplyModifiedProperties();
 
-                        copiedPersistentCalls.Dispose();
-                        copiedPersistentCalls = null;
+                        CleanUpAfterCopy();
                     });
+
+                if (copiedPersistentCalls != null && copySelectedIndex > -1)
+                    menu.AddItem(new GUIContent("Paste"), false, () =>
+                    {
+                        copiedPersistentCalls.Update();
+
+                        persistentCalls.InsertArrayElementAtIndex(persistentCalls.arraySize);
+                        CopyEvent(persistentCalls, persistentCalls.arraySize - 1, copySelectedIndex);
+
+                        property.serializedObject.ApplyModifiedProperties();
+
+                        CleanUpAfterCopy();
+                    });
+
                 menu.DropDown(rect);
             });
 
@@ -92,6 +150,33 @@ namespace BennyKok.EventDrawer.Editor
             EditorGUI.EndFoldoutHeaderGroup();
 
             EditorGUI.indentLevel--;
+        }
+
+        private void CleanUpAfterCopy()
+        {
+            copiedPersistentCalls.Dispose();
+            copiedPersistentCalls = null;
+            targetPersistentCalls = null;
+            copySelectedIndex = -1;
+        }
+
+        private void CopyEvent(SerializedProperty persistentCalls, int i, int j)
+        {
+            var item = persistentCalls.GetArrayElementAtIndex(i);
+            var copyItem = targetPersistentCalls.GetArrayElementAtIndex(j);
+
+            CopyPersistentCallProperty("m_Target", item, copyItem);
+            CopyPersistentCallProperty("m_TargetAssemblyTypeName", item, copyItem);
+            CopyPersistentCallProperty("m_MethodName", item, copyItem);
+            CopyPersistentCallProperty("m_Mode", item, copyItem);
+            CopyPersistentCallProperty("m_CallState", item, copyItem);
+
+            CopyPersistentCallProperty("m_Arguments.m_ObjectArgument", item, copyItem);
+            CopyPersistentCallProperty("m_Arguments.m_ObjectArgumentAssemblyTypeName", item, copyItem);
+            CopyPersistentCallProperty("m_Arguments.m_IntArgument", item, copyItem);
+            CopyPersistentCallProperty("m_Arguments.m_FloatArgument", item, copyItem);
+            CopyPersistentCallProperty("m_Arguments.m_StringArgument", item, copyItem);
+            CopyPersistentCallProperty("m_Arguments.m_BoolArgument", item, copyItem);
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -164,7 +249,7 @@ namespace BennyKok.EventDrawer.Editor
 
         static PersistentListenerMode GetMode(SerializedProperty mode)
         {
-            return (PersistentListenerMode) mode.enumValueIndex;
+            return (PersistentListenerMode)mode.enumValueIndex;
         }
 
         protected override void SetupReorderableList(ReorderableList list)
@@ -282,7 +367,7 @@ namespace BennyKok.EventDrawer.Editor
                 EditorGUI.PropertyField(argRect, argument, GUIContent.none);
             }
 
-            using(new EditorGUI.DisabledScope(listenerTarget.objectReferenceValue == null))
+            using (new EditorGUI.DisabledScope(listenerTarget.objectReferenceValue == null))
             {
                 EditorGUI.BeginProperty(functionRect, GUIContent.none, methodName);
                 {
@@ -349,16 +434,16 @@ namespace BennyKok.EventDrawer.Editor
             rect.x = 0;
             rect.y = 0;
 
-            if ((double) anim.faded == 0.0)
+            if ((double)anim.faded == 0.0)
                 return false;
-            if ((double) anim.faded == 1.0)
+            if ((double)anim.faded == 1.0)
                 return true;
 
             var c = GUI.color;
             c.a = anim.faded;
             GUI.color = c;
 
-            if ((double) anim.faded != 0.0 && (double) anim.faded != 1.0)
+            if ((double)anim.faded != 0.0 && (double)anim.faded != 1.0)
             {
                 if (Event.current.type == EventType.MouseDown)
                 {
@@ -368,7 +453,7 @@ namespace BennyKok.EventDrawer.Editor
                 GUI.FocusControl(null);
             }
 
-            return (double) anim.faded != 0.0;
+            return (double)anim.faded != 0.0;
         }
 
         public static void EndFade()

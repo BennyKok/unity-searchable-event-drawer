@@ -4,5 +4,6 @@
   "description": "Searchable and compact drawer for UnityEvent",
   "author": "BennyKok",
   "license": "MIT",
-  "type": "tool"
+  "type": "tool",
+  "displayName": "Searchable Event Drawer"
 }
