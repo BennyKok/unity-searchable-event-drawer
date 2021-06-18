@@ -1,7 +1,7 @@
 {
   "name": "unity-searchable-event-drawer",
   "version": "1.0.0",
-  "description": "Searchable drawer for UnityEvent",
+  "description": "Searchable and compact drawer for UnityEvent",
   "author": "BennyKok",
   "license": "MIT",
   "type": "tool"
