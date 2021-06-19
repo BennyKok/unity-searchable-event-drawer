@@ -17,9 +17,15 @@ namespace BennyKok.EventDrawer.Editor
         private Dictionary<int, Action> idToActionMap = new Dictionary<int, Action>();
         private string title = "Items";
 
+        #if UNITY_2021_2_OR_NEWER
         static PropertyInfo menuItemsField = typeof(GenericMenu).GetProperty("menuItems",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
+        #else
+        static FieldInfo menuItemsField = typeof(GenericMenu).GetField("menuItems",
+            BindingFlags.NonPublic |
+            BindingFlags.Instance);
+        #endif
 
         static FieldInfo menuItemContentField = typeof(GenericMenu).GetNestedType("MenuItem", BindingFlags.NonPublic |
             BindingFlags.Instance)?.GetField("content",
