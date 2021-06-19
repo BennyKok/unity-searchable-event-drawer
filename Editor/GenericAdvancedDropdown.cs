@@ -13,19 +13,25 @@ namespace BennyKok.EventDrawer.Editor
 {
     public class GenericAdvancedDropdown : AdvancedDropdown
     {
-        private Dictionary<string, Action> pathToActionMap = new Dictionary<string, Action>();
+        private Dictionary<string, Entry> pathToActionMap = new Dictionary<string, Entry>();
         private Dictionary<int, Action> idToActionMap = new Dictionary<int, Action>();
         private string title = "Items";
 
-        #if UNITY_2021_2_OR_NEWER
+        public struct Entry
+        {
+            public Action action;
+            public Texture2D icon;
+        }
+
+#if UNITY_2021_2_OR_NEWER
         static PropertyInfo menuItemsField = typeof(GenericMenu).GetProperty("menuItems",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
-        #else
+#else
         static FieldInfo menuItemsField = typeof(GenericMenu).GetField("menuItems",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
-        #endif
+#endif
 
         static FieldInfo menuItemContentField = typeof(GenericMenu).GetNestedType("MenuItem", BindingFlags.NonPublic |
             BindingFlags.Instance)?.GetField("content",
@@ -59,7 +65,7 @@ namespace BennyKok.EventDrawer.Editor
             this.title = title;
         }
 
-        public GenericAdvancedDropdown(string title, GenericMenu menu) : base(new AdvancedDropdownState())
+        public GenericAdvancedDropdown(string title, GenericMenu menu, Func<GUIContent, Texture2D> iconCallback = null) : base(new AdvancedDropdownState())
         {
             this.title = title;
 
@@ -83,7 +89,7 @@ namespace BennyKok.EventDrawer.Editor
                 {
                     if (function != null) function();
                     if (function2 != null) function2(userData);
-                });
+                }, iconCallback?.Invoke(content));
             }
         }
 
@@ -116,7 +122,7 @@ namespace BennyKok.EventDrawer.Editor
             Show(r);
         }
 
-        public void AddItem(string label, Action action)
+        public void AddItem(string label, Action action, Texture2D icon = null)
         {
             var tempLabel = label;
             var index = 0;
@@ -125,7 +131,11 @@ namespace BennyKok.EventDrawer.Editor
                 index++;
                 tempLabel = label + " " + index.ToString();
             }
-            pathToActionMap.Add(tempLabel, action);
+            pathToActionMap.Add(tempLabel, new Entry()
+            {
+                action = action,
+                icon = icon,
+            });
         }
 
         protected override AdvancedDropdownItem BuildRoot()
@@ -150,6 +160,7 @@ namespace BennyKok.EventDrawer.Editor
                     }
 
                     var child = new AdvancedDropdownItem(str);
+
                     parent.AddChild(child);
 
                     parent = child;
@@ -158,7 +169,8 @@ namespace BennyKok.EventDrawer.Editor
 
                 if (lastItem != null && !idToActionMap.ContainsKey(lastItem.id))
                 {
-                    idToActionMap.Add(lastItem.id, item.Value);
+                    lastItem.icon = item.Value.icon;
+                    idToActionMap.Add(lastItem.id, item.Value.action);
                 }
             }
 

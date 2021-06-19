@@ -20,6 +20,8 @@ namespace BennyKok.EventDrawer.Editor
         public static SerializedProperty targetPersistentCalls;
         public static int copySelectedIndex = -1;
 
+        public static Dictionary<string, GUIContent> stringToTypeCache = new Dictionary<string, GUIContent>();
+
         Dictionary<string, MState> states = new Dictionary<string, MState>();
 
         public class MState
@@ -505,9 +507,35 @@ namespace BennyKok.EventDrawer.Editor
                     if (GUI.Button(functionRect, buttonContent, EditorStyles.popup))
                     {
                         var menu = BuildPopupList(listenerTarget.objectReferenceValue, m_DummyEvent, pListener);
-                        new GenericAdvancedDropdown("Functions", menu).Dropdown(functionRect, 10);
-                    }
+                        new GenericAdvancedDropdown("Functions", menu, (content) =>
+                        {
+                            if (content.text.StartsWith(kNoFunctionString)) return null;
 
+                            var type = content.text.Substring(0, content.text.IndexOf("/"));
+
+                            if (!stringToTypeCache.TryGetValue(type, out var c))
+                            {
+                                Type t = null;
+                                var types = TypeCache.GetTypesDerivedFrom<Object>();
+                                for (int n = 0; n < types.Count; n++)
+                                {
+                                    if (type == types[n].Name)
+                                    {
+                                        t = types[n];
+                                        break; 
+                                    }
+                                }
+                                c = EditorGUIUtility.ObjectContent(null, t);
+                                if (c.image == null)
+                                    c = EditorGUIUtility.IconContent("cs Script Icon");
+
+                                stringToTypeCache.Add(type, c);
+                            }
+
+                            return c.image as Texture2D;
+
+                        }).Dropdown(functionRect, 10);
+                    }
                 }
                 EditorGUI.EndProperty();
             }
