@@ -20,9 +20,15 @@ namespace BennyKok.EventDrawer.Editor
         public static SerializedProperty targetPersistentCalls;
         public static int copySelectedIndex = -1;
 
-        Dictionary<string, AnimBool> states = new Dictionary<string, AnimBool>();
+        Dictionary<string, MState> states = new Dictionary<string, MState>();
 
-        public AnimBool GetCurrentState(SerializedProperty property)
+        public class MState
+        {
+            public AnimBool visible;
+            public int lastSelected;
+        }
+
+        public MState GetCurrentState(SerializedProperty property, bool defaultValue)
         {
             if (!states.TryGetValue(property.propertyPath, out var currentTabState))
             {
@@ -32,10 +38,13 @@ namespace BennyKok.EventDrawer.Editor
                 {
                     DrawerUtil.RepaintInspector(property.serializedObject);
                 });
-                visible.value = property.isExpanded;
-                states.Add(property.propertyPath, visible);
+                visible.value = defaultValue;
 
-                currentTabState = visible;
+                currentTabState = new MState()
+                {
+                    visible = visible,
+                };
+                states.Add(property.propertyPath, currentTabState);
             }
             return currentTabState;
         }
@@ -63,21 +72,21 @@ namespace BennyKok.EventDrawer.Editor
                 case SerializedPropertyType.Float:
                     serializedProperty.floatValue = serializedProperty1.floatValue;
                     break;
+                case SerializedPropertyType.Boolean:
+                    serializedProperty.boolValue = serializedProperty1.boolValue;
+                    break;
+                case SerializedPropertyType.Color:
+                    serializedProperty.colorValue = serializedProperty1.colorValue;
+                    break;
+                case SerializedPropertyType.Vector3:
+                    serializedProperty.vector3Value = serializedProperty1.vector3Value;
+                    break;
             }
-        }
-
-        private int lastSelected;
-
-        protected override void OnSelectEvent(ReorderableList list)
-        {
-            base.OnSelectEvent(list);
-            lastSelected = list.index;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             m_Prop = property;
-            var visible = GetCurrentState(property);
 
             // EditorGUI.indentLevel++;
             position = EditorGUI.IndentedRect(position);
@@ -86,6 +95,8 @@ namespace BennyKok.EventDrawer.Editor
             var temp = new GUIContent(label);
 
             SerializedProperty persistentCalls = property.FindPropertyRelative("m_PersistentCalls.m_Calls");
+            var m_state = GetCurrentState(persistentCalls, property.isExpanded);
+            var visible = m_state.visible;
             if (persistentCalls != null)
                 temp.text += " (" + persistentCalls.arraySize + ")";
 
@@ -101,54 +112,14 @@ namespace BennyKok.EventDrawer.Editor
                     persistentCalls.ClearArray();
                     property.serializedObject.ApplyModifiedProperties();
                 });
-                menu.AddItem(new GUIContent("Copy Selected"), false, () =>
-                {
-                    if (copiedPersistentCalls != null)
-                        copiedPersistentCalls.Dispose();
-
-                    copySelectedIndex = lastSelected;
-                    copiedPersistentCalls = new SerializedObject(property.serializedObject.targetObject);
-                    targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
-                });
-                menu.AddItem(new GUIContent("Copy All"), false, () =>
-                {
-                    if (copiedPersistentCalls != null)
-                        copiedPersistentCalls.Dispose();
-
-                    copySelectedIndex = -1;
-                    copiedPersistentCalls = new SerializedObject(property.serializedObject.targetObject);
-                    targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
-                });
+                AddCopySelectOption(property.serializedObject, persistentCalls, menu, "Copy Selected", m_state.lastSelected);
+                AddCopyAllOption(property, persistentCalls, menu);
 
                 if (copiedPersistentCalls != null && copySelectedIndex == -1)
-                    menu.AddItem(new GUIContent("Paste All"), false, () =>
-                    {
-                        copiedPersistentCalls.Update();
-
-                        persistentCalls.ClearArray();
-                        persistentCalls.arraySize = targetPersistentCalls.arraySize;
-                        for (int i = 0; i < persistentCalls.arraySize; i++)
-                        {
-                            CopyEvent(persistentCalls, i, i);
-                        }
-
-                        property.serializedObject.ApplyModifiedProperties();
-
-                        CleanUpAfterCopy();
-                    });
+                    AddPasteAllOption(property, persistentCalls, menu);
 
                 if (copiedPersistentCalls != null && copySelectedIndex > -1)
-                    menu.AddItem(new GUIContent("Paste"), false, () =>
-                    {
-                        copiedPersistentCalls.Update();
-
-                        persistentCalls.InsertArrayElementAtIndex(persistentCalls.arraySize);
-                        CopyEvent(persistentCalls, persistentCalls.arraySize - 1, copySelectedIndex);
-
-                        property.serializedObject.ApplyModifiedProperties();
-
-                        CleanUpAfterCopy();
-                    });
+                    AddPasteSelectOption(property.serializedObject, persistentCalls, menu, persistentCalls.arraySize);
 
                 menu.DropDown(rect);
             });
@@ -165,12 +136,76 @@ namespace BennyKok.EventDrawer.Editor
                 var text = label.text;
                 label.text = null;
                 base.OnGUI(position, property, label);
+
+                m_state.lastSelected = (m_LastSelectedIndexField.GetValue(this) as int?).Value;
+
                 label.text = text;
             }
             DrawerUtil.EndFade();
             EditorGUI.EndFoldoutHeaderGroup();
 
             // EditorGUI.indentLevel--;
+        }
+
+        private void AddPasteSelectOption(SerializedObject property, SerializedProperty persistentCalls, GenericMenu menu, int targetIndex)
+        {
+            menu.AddItem(new GUIContent("Paste"), false, () =>
+            {
+                copiedPersistentCalls.Update();
+
+                persistentCalls.InsertArrayElementAtIndex(targetIndex);
+                CopyEvent(persistentCalls, targetIndex, copySelectedIndex);
+
+                property.ApplyModifiedProperties();
+
+                CleanUpAfterCopy();
+                DrawerUtil.RepaintInspector(property);
+            });
+        }
+
+        private void AddPasteAllOption(SerializedProperty property, SerializedProperty persistentCalls, GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Paste All"), false, () =>
+            {
+                copiedPersistentCalls.Update();
+
+                persistentCalls.ClearArray();
+                persistentCalls.arraySize = targetPersistentCalls.arraySize;
+                for (int i = 0; i < persistentCalls.arraySize; i++)
+                {
+                    CopyEvent(persistentCalls, i, i);
+                }
+
+                property.serializedObject.ApplyModifiedProperties();
+
+                CleanUpAfterCopy();
+            });
+        }
+
+        public void AddCopySelectOption(SerializedObject property, SerializedProperty persistentCalls, GenericMenu menu, string label, int index)
+        {
+            menu.AddItem(new GUIContent(label), false, () =>
+            {
+                if (copiedPersistentCalls != null)
+                    copiedPersistentCalls.Dispose();
+
+                copySelectedIndex = index;
+                copiedPersistentCalls = new SerializedObject(property.targetObject);
+                targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
+            });
+        }
+
+        public void AddCopyAllOption(SerializedProperty property, SerializedProperty persistentCalls, GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Copy All"), false, () =>
+            {
+                if (copiedPersistentCalls != null)
+                    copiedPersistentCalls.Dispose();
+
+                copySelectedIndex = -1;
+                copiedPersistentCalls = new SerializedObject(property.serializedObject.targetObject);
+                targetPersistentCalls = copiedPersistentCalls.FindProperty(persistentCalls.propertyPath);
+            });
         }
 
         private void CleanUpAfterCopy()
@@ -203,7 +238,9 @@ namespace BennyKok.EventDrawer.Editor
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             var baseHeight = base.GetPropertyHeight(property, label);
-            var visible = GetCurrentState(property);
+            SerializedProperty persistentCalls = property.FindPropertyRelative("m_PersistentCalls.m_Calls");
+            var m_state = GetCurrentState(persistentCalls, property.isExpanded);
+            var visible = m_state.visible;
 
             if (property.propertyPath.Contains("Array"))
                 return visible.target ? baseHeight + EditorGUIUtility.singleLineHeight : EditorGUIUtility.singleLineHeight;
@@ -237,6 +274,14 @@ namespace BennyKok.EventDrawer.Editor
             BindingFlags.Instance);
 
         static FieldInfo m_DummyEventField = typeof(UnityEventDrawer).GetField("m_DummyEvent",
+            BindingFlags.NonPublic |
+            BindingFlags.Instance);
+
+        static FieldInfo m_LastSelectedIndexField = typeof(UnityEventDrawer).GetField("m_LastSelectedIndex",
+            BindingFlags.NonPublic |
+            BindingFlags.Instance);
+
+        static FieldInfo m_ReorderableListField = typeof(UnityEventDrawer).GetField("m_ReorderableList",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
 
@@ -283,6 +328,8 @@ namespace BennyKok.EventDrawer.Editor
 
             var pListener = m_ListenersArray.GetArrayElementAtIndex(index);
 
+            var m_state = GetCurrentState(m_ListenersArray, false);
+
             rect.y++;
             Rect[] subRects = GetRowRects(rect);
             Rect enabledRect = subRects[0];
@@ -304,7 +351,39 @@ namespace BennyKok.EventDrawer.Editor
             Color c = GUI.backgroundColor;
             GUI.backgroundColor = Color.white;
 
+            Event current = Event.current;
+            var tempRect = rect;
+            tempRect.x -= 20;
+            if (tempRect.Contains(current.mousePosition) && current.type == EventType.ContextClick)
+            {
+                DrawerUtil.RepaintInspector(m_ListenersArray.serializedObject);
+
+                GenericMenu menu = new GenericMenu();
+
+                AddCopySelectOption(m_ListenersArray.serializedObject, m_ListenersArray, menu, "Copy", index);
+                if (copiedPersistentCalls != null && copySelectedIndex > -1)
+                    AddPasteSelectOption(m_ListenersArray.serializedObject, m_ListenersArray, menu, index + 1);
+
+                menu.AddSeparator("");
+                for (int i = 0; i < callState.enumDisplayNames.Length; i++)
+                {
+                    string state = (string)callState.enumDisplayNames[i];
+                    int localI = i;
+                    menu.AddItem(new GUIContent(state), callState.enumValueIndex == localI, () =>
+                    {
+                        callState.enumValueIndex = localI;
+                        callState.serializedObject.ApplyModifiedProperties();
+                    });
+                }
+
+                menu.ShowAsContext();
+
+                current.Use();
+            };
+
             // EditorGUI.PropertyField(enabledRect, callState, GUIContent.none);
+
+            EditorGUI.BeginDisabledGroup(callState.enumValueIndex == 0);
 
             EditorGUI.BeginChangeCheck();
             {
@@ -433,6 +512,8 @@ namespace BennyKok.EventDrawer.Editor
                 EditorGUI.EndProperty();
             }
             GUI.backgroundColor = c;
+
+            EditorGUI.EndDisabledGroup();
         }
     }
 
