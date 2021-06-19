@@ -118,7 +118,14 @@ namespace BennyKok.EventDrawer.Editor
 
         public void AddItem(string label, Action action)
         {
-            pathToActionMap.Add(label, action);
+            var tempLabel = label;
+            var index = 0;
+            while (pathToActionMap.ContainsKey(tempLabel))
+            {
+                index++;
+                tempLabel = label + " " + index.ToString();
+            }
+            pathToActionMap.Add(tempLabel, action);
         }
 
         protected override AdvancedDropdownItem BuildRoot()
