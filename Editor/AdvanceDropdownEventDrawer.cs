@@ -20,8 +20,25 @@ namespace BennyKok.EventDrawer.Editor
         public static SerializedProperty targetPersistentCalls;
         public static int copySelectedIndex = -1;
 
-        private AnimBool visible;
-        private bool m_visible;
+        Dictionary<string, AnimBool> states = new Dictionary<string, AnimBool>();
+
+        public AnimBool GetCurrentState(SerializedProperty property)
+        {
+            if (!states.TryGetValue(property.propertyPath, out var currentTabState))
+            {
+                var visible = new AnimBool();
+                visible.speed = DrawerUtil.AnimSpeed;
+                visible.valueChanged.AddListener(() =>
+                {
+                    DrawerUtil.RepaintInspector(property.serializedObject);
+                });
+                visible.value = property.isExpanded;
+                states.Add(property.propertyPath, visible);
+
+                currentTabState = visible;
+            }
+            return currentTabState;
+        }
 
         private void CopyPersistentCallProperty(string relative, SerializedProperty item, SerializedProperty copyItem)
         {
@@ -60,10 +77,10 @@ namespace BennyKok.EventDrawer.Editor
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             m_Prop = property;
-            Init(property);
+            var visible = GetCurrentState(property);
 
-            EditorGUI.indentLevel++;
-
+            // EditorGUI.indentLevel++;
+            position = EditorGUI.IndentedRect(position);
 
             position.height = EditorGUIUtility.singleLineHeight;
             var temp = new GUIContent(label);
@@ -74,7 +91,9 @@ namespace BennyKok.EventDrawer.Editor
 
             EditorGUI.BeginChangeCheck();
 
-            m_visible = EditorGUI.BeginFoldoutHeaderGroup(position, m_visible, temp, null, (rect) =>
+            // visible.target = property.isExpanded;
+            var tempBool = property.isExpanded;
+            property.isExpanded = EditorGUI.BeginFoldoutHeaderGroup(position, property.isExpanded, temp, null, (rect) =>
             {
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Reset"), false, () =>
@@ -135,7 +154,9 @@ namespace BennyKok.EventDrawer.Editor
             });
 
             if (EditorGUI.EndChangeCheck())
-                visible.target = m_visible;
+            {
+                visible.target = property.isExpanded;
+            }
 
             position.height = base.GetPropertyHeight(property, label) * visible.faded;
             position.y += EditorGUIUtility.singleLineHeight;
@@ -149,7 +170,7 @@ namespace BennyKok.EventDrawer.Editor
             DrawerUtil.EndFade();
             EditorGUI.EndFoldoutHeaderGroup();
 
-            EditorGUI.indentLevel--;
+            // EditorGUI.indentLevel--;
         }
 
         private void CleanUpAfterCopy()
@@ -181,20 +202,14 @@ namespace BennyKok.EventDrawer.Editor
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            Init(property);
-            return visible.value ? base.GetPropertyHeight(property, label) * visible.faded + EditorGUIUtility.singleLineHeight : EditorGUIUtility.singleLineHeight;
-        }
+            var baseHeight = base.GetPropertyHeight(property, label);
+            var visible = GetCurrentState(property);
 
-        private void Init(SerializedProperty property)
-        {
-            if (visible == null)
-            {
-                visible = new AnimBool();
-                visible.speed = DrawerUtil.AnimSpeed;
-                visible.valueChanged.AddListener(() => { DrawerUtil.RepaintInspector(property.serializedObject); });
-            }
-        }
+            if (property.propertyPath.Contains("Array"))
+                return visible.target ? baseHeight + EditorGUIUtility.singleLineHeight : EditorGUIUtility.singleLineHeight;
 
+            return baseHeight * visible.faded + EditorGUIUtility.singleLineHeight;
+        }
 
         private const string kNoFunctionString = "No Function";
 
@@ -465,7 +480,11 @@ namespace BennyKok.EventDrawer.Editor
         public static void RepaintInspector(SerializedObject BaseObject)
         {
             foreach (var item in ActiveEditorTracker.sharedTracker.activeEditors)
-                if (item.serializedObject == BaseObject) { item.Repaint(); return; }
+                if (item.serializedObject == BaseObject)
+                {
+                    item.Repaint();
+                    return;
+                }
         }
     }
 }
