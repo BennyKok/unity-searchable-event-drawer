@@ -8,6 +8,7 @@ using Object = UnityEngine.Object;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor.AnimatedValues;
+using UnityEngine.EventSystems;
 
 namespace BennyKok.EventDrawer.Editor
 {
@@ -90,6 +91,13 @@ namespace BennyKok.EventDrawer.Editor
         {
             m_Prop = property;
 
+            var trailingSpaceInHeader = false;
+
+            if (property.serializedObject.targetObject is EventTrigger)
+            {
+                trailingSpaceInHeader = true;
+            }
+
             // EditorGUI.indentLevel++;
             position = EditorGUI.IndentedRect(position);
 
@@ -106,7 +114,10 @@ namespace BennyKok.EventDrawer.Editor
 
             // visible.target = property.isExpanded;
             var tempBool = property.isExpanded;
-            property.isExpanded = EditorGUI.BeginFoldoutHeaderGroup(position, property.isExpanded, temp, null, (rect) =>
+            var headerRect = position;
+            if (trailingSpaceInHeader)
+                headerRect.width -= 30;
+            property.isExpanded = EditorGUI.BeginFoldoutHeaderGroup(headerRect, property.isExpanded, temp, null, (rect) =>
             {
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Reset"), false, () =>
@@ -522,7 +533,7 @@ namespace BennyKok.EventDrawer.Editor
                                     if (type == types[n].Name)
                                     {
                                         t = types[n];
-                                        break; 
+                                        break;
                                     }
                                 }
                                 c = EditorGUIUtility.ObjectContent(null, t);
