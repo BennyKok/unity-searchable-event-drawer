@@ -524,7 +524,7 @@ namespace BennyKok.EventDrawer.Editor
 
                             var type = content.text.Substring(0, content.text.IndexOf("/"));
 
-                            if (!stringToTypeCache.TryGetValue(type, out var c))
+                            if (!stringToTypeCache.TryGetValue(type, out var value))
                             {
                                 Type t = null;
                                 var types = TypeCache.GetTypesDerivedFrom<Object>();
@@ -536,14 +536,14 @@ namespace BennyKok.EventDrawer.Editor
                                         break;
                                     }
                                 }
-                                c = EditorGUIUtility.ObjectContent(null, t);
-                                if (c.image == null)
-                                    c = EditorGUIUtility.IconContent("cs Script Icon");
+                                value = EditorGUIUtility.ObjectContent(null, t);
+                                if (value.image == null)
+                                    value = EditorGUIUtility.IconContent("cs Script Icon");
 
-                                stringToTypeCache.Add(type, c);
+                                stringToTypeCache.Add(type, value);
                             }
 
-                            return c.image as Texture2D;
+                            return value.image as Texture2D;
 
                         }).Dropdown(functionRect, 10);
                     }
