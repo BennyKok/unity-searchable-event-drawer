@@ -150,7 +150,7 @@ namespace BennyKok.EventDrawer.Editor
 
                 foreach (var str in splitStrings)
                 {
-                    var foundChildItem = parent.children.FirstOrDefault(item => item.name == str);
+                    var foundChildItem = parent.children.FirstOrDefault(children => children.name == str);
 
                     if (foundChildItem != null)
                     {
