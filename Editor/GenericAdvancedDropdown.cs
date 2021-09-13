@@ -23,15 +23,20 @@ namespace BennyKok.EventDrawer.Editor
             public Texture2D icon;
         }
 
-#if UNITY_2021_2_OR_NEWER
-        static PropertyInfo menuItemsField = typeof(GenericMenu).GetProperty("menuItems",
+
+        // #if UNITY_2021_1_20
+        //         static PropertyInfo menuItemsField = typeof(GenericMenu).GetProperty("menuItems",
+        //             BindingFlags.NonPublic |
+        //             BindingFlags.Instance);
+        // #elif UNITY_2021_2_OR_NEWER
+        static PropertyInfo menuItemsField2 = typeof(GenericMenu).GetProperty("menuItems",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
-#else
+        // #else
         static FieldInfo menuItemsField = typeof(GenericMenu).GetField("menuItems",
             BindingFlags.NonPublic |
             BindingFlags.Instance);
-#endif
+        // #endif
 
         static FieldInfo menuItemContentField = typeof(GenericMenu).GetNestedType("MenuItem", BindingFlags.NonPublic |
             BindingFlags.Instance)?.GetField("content",
@@ -69,7 +74,33 @@ namespace BennyKok.EventDrawer.Editor
         {
             this.title = title;
 
-            var allItems = menuItemsField.GetValue(menu) as IEnumerable;
+            // foreach (var item in typeof(GenericMenu).GetProperties(BindingFlags.NonPublic |
+            // BindingFlags.Instance))
+            // {
+            //     Debug.Log(item.Name);
+            // }
+
+            // Debug.Log("------------------");
+
+            // foreach (var item in typeof(GenericMenu).GetFields(BindingFlags.NonPublic |
+            // BindingFlags.Instance))
+            // {
+            //     Debug.Log(item.Name);
+            // }
+
+            IEnumerable allItems = null;
+            
+            if (menuItemsField == null)
+            {
+                var raw2 = menuItemsField2.GetValue(menu);
+                allItems = raw2 as IEnumerable;
+            }
+            else
+            {
+                var raw = menuItemsField.GetValue(menu);
+                allItems = raw as IEnumerable;
+            }
+
             foreach (var item in allItems)
             {
                 var content = menuItemContentField.GetValue(item) as GUIContent;
